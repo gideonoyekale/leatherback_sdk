@@ -27,7 +27,7 @@ class CardInputScreen extends StatefulWidget {
 
 class _CardInputScreenState extends State<CardInputScreen> {
   final _cardFormatter = MaskTextInputFormatter(
-    mask: '#### - #### - #### - ####',
+    mask: '#### #### #### ####',
     filter: {"#": RegExp(r'[0-9]')},
     type: MaskAutoCompletionType.lazy,
   );
@@ -201,8 +201,8 @@ class _CardInputScreenState extends State<CardInputScreen> {
                                 onPressed: () => Navigator.pop(
                                   context,
                                   PaymentCard(
-                                    number: _number.replaceAll(' - ', ''),
-                                    cardNumber: _number.replaceAll(' - ', ' '),
+                                    number: _number.replaceAll(' ', ''),
+                                    cardNumber: _number,
                                     cvv: _cvv,
                                     expiryDate: _date,
                                     expMonth: int.parse(_date.split('/')[0]),
@@ -211,10 +211,10 @@ class _CardInputScreenState extends State<CardInputScreen> {
                                   ),
                                 ),
                                 title: 'Pay Now',
-                                active: _number.replaceAll(' - ', '').length ==
-                                        16 &&
-                                    _date.replaceAll('/', '').length == 4 &&
-                                    _cvv.length == 3,
+                                active:
+                                    _number.replaceAll(' ', '').length == 16 &&
+                                        _date.replaceAll('/', '').length == 4 &&
+                                        _cvv.length == 3,
                               ),
                             ),
                           ],

@@ -7,7 +7,9 @@ import 'package:leatherback_sdk/core/enums/payment_status.dart';
 import 'package:leatherback_sdk/models/leatherback_exception.dart';
 import 'package:leatherback_sdk/models/models.dart';
 import 'package:leatherback_sdk/ui/screens/bank_transfer_details_srceen.dart';
+import 'package:leatherback_sdk/ui/screens/card_auth_screen.dart';
 import 'package:leatherback_sdk/ui/screens/card_input_screen.dart';
+import 'package:leatherback_sdk/ui/screens/finalise_payment_screen.dart';
 import 'package:leatherback_sdk/ui/screens/payment_option_screen.dart';
 import 'package:leatherback_sdk/ui/screens/transaction_status_screen.dart';
 
@@ -71,45 +73,55 @@ class LeatherbackSDK {
     _isLoading = false;
   }
 
-  // Future<LeatherbackResponse> makePayment() async {
-  //   await _dialogService.showAppDialog(
-  //     BankTransferDetailsScreen(
-  //       amount: amount,
-  //       currency: currency,
-  //       transferInfo: TransferInfo(),
-  //     ),
-  //   );
-  //   return _response;
-  // }
-
   Future<LeatherbackResponse> makePayment() async {
-    try {
-      _reset();
-      await _validatePayment();
-      await _selectPaymentChannel();
-      _param = PaymentParam(
+    await _dialogService.showAppDialog(
+      CardAuthScreen(
         amount: amount,
-        channel: _selected?.slug,
-        narration: 'Payment from mobile',
-        userInformation: customer,
         currency: currency,
-        reference: reference,
-      );
-      if (_selected == Channel.card) {
-        await _makePaymentWithCard();
-      } else if (_selected == Channel.transfer) {
-        await _makePaymentWithBankTransfer();
-      }
-      return _response;
-    } catch (e) {
-      _closeLoading();
-      _response = LeatherbackResponse(isSuccess: false, message: e.toString());
-      await _dialogService.showAppDialog(
-        TransactionStatusScreen.failed(message: e.toString()),
-      );
-      return _response;
-    }
+        html: '',
+      ),
+    );
+    // Navigator.push(
+    //   context,
+    //   MaterialPageRoute(
+    //     builder: (c) => CardAuthScreen(
+    //       amount: amount,
+    //       currency: currency,
+    //       html: '',
+    //     ),
+    //   ),
+    // );
+    return _response;
   }
+
+  // Future<LeatherbackResponse> makePayment() async {
+  //   try {
+  //     _reset();
+  //     await _validatePayment();
+  //     await _selectPaymentChannel();
+  //     _param = PaymentParam(
+  //       amount: amount,
+  //       channel: _selected?.slug,
+  //       narration: 'Payment from mobile',
+  //       userInformation: customer,
+  //       currency: currency,
+  //       reference: reference,
+  //     );
+  //     if (_selected == Channel.card) {
+  //       await _makePaymentWithCard();
+  //     } else if (_selected == Channel.transfer) {
+  //       await _makePaymentWithBankTransfer();
+  //     }
+  //     return _response;
+  //   } catch (e) {
+  //     _closeLoading();
+  //     _response = LeatherbackResponse(isSuccess: false, message: e.toString());
+  //     await _dialogService.showAppDialog(
+  //       TransactionStatusScreen.failed(message: e.toString()),
+  //     );
+  //     return _response;
+  //   }
+  // }
 
   Future<void> _makePaymentWithCard() async {
     _closeLoading();
@@ -140,7 +152,41 @@ class LeatherbackSDK {
     } else if (paymentRes.paymentStatus == PaymentStatus.initiated.title) {
       if (currency == 'GBP') {
         await _checkTransactionStatus(paymentRes);
-      } else {}
+      } else {
+        await _finalisePayment(paymentRes);
+      }
+    } else if (paymentRes.paymentStatus ==
+        PaymentStatus.requireBankAuth.title) {}
+  }
+
+  Future<void> _finalisePayment(PaymentResponse paymentResponse) async {
+    _closeLoading();
+    _isLoading = true;
+    _dialogService.showAppDialog(
+      FinalisePaymentScreen(
+        amount: amount,
+        currency: currency,
+      ),
+    );
+    final res = await _paymentService.finalisePayment(
+      paymentResponse.paymentItem?.reference ?? '',
+    );
+    _isLoading = true;
+    _dialogService.dismiss();
+    if (res.success) {
+      _response = LeatherbackResponse(
+        isSuccess: true,
+        message: 'Payment Successful',
+        data: paymentResponse.paymentItem?.paymentReference,
+      );
+      await _dialogService.showAppDialog(
+        const TransactionStatusScreen.success(),
+      );
+    } else {
+      _response = LeatherbackResponse(
+        message: res.message,
+        isSuccess: false,
+      );
     }
   }
 

@@ -17,6 +17,7 @@ class Assets {
   static const String linePatternDarkUrl =
       'https://leatherbackstorage.blob.core.windows.net/frontend/payment-link/backgrounds/line-pattern-dark.svg';
   static const String loader = 'assets/jsons/loader.json';
+  static const String processingLoader = 'assets/jsons/processing_loader.json';
   static const String loaderUrl =
       'https://leatherbackstorage.blob.core.windows.net/frontend/Aaas/loader.json';
   static const String cautionIconUrl =

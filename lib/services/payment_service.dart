@@ -59,7 +59,8 @@ class PaymentService {
 
   Future<String> getAuth3ds(String reference) async {
     final res = await _networkService.get(
-      Endpoints.transactionStatus(reference),
+      Endpoints.getAuth3ds,
+      queryParameters: {'referenceId': reference},
     );
     return res['value']['authenticationhtml'];
   }

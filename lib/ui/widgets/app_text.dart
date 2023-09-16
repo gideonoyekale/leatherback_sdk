@@ -35,7 +35,7 @@ class AppText extends StatelessWidget {
       text,
       maxLines: maxLines,
       style: style ??
-          GoogleFonts.roboto(
+          GoogleFonts.karla(
             color: color,
             fontWeight: fontWeight,
             fontStyle: fontStyle,

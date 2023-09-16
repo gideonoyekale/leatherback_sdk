@@ -260,9 +260,9 @@ class _BankTransferDetailsScreenState extends State<BankTransferDetailsScreen> {
     );
   }
 
-  TextStyle get normalTextStyle => GoogleFonts.roboto();
+  TextStyle get normalTextStyle => GoogleFonts.karla();
 
-  TextStyle get boldTextStyle => GoogleFonts.roboto(
+  TextStyle get boldTextStyle => GoogleFonts.karla(
         fontWeight: FontWeight.bold,
       );
 }

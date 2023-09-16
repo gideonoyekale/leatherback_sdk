@@ -15,4 +15,6 @@ class FinalisePaymentResponse {
     data['message'] = message;
     return data;
   }
+
+  bool get success => status == 'Successful';
 }
