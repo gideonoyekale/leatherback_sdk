@@ -24,7 +24,7 @@ class NetworkService {
   }) async {
     try {
       Uri uri = Uri.parse(url);
-      uri.replace(queryParameters: queryParameters);
+      uri = uri.replace(queryParameters: queryParameters);
       Console.log('[LeatherbackSDK][PATH]', uri.toString());
       final http.Response res = await http.get(
         uri,

@@ -53,7 +53,6 @@ class PaymentService {
       Endpoints.transactionStatus(reference),
     );
     final status = TransactionStatusResponse.fromJson(res['value']);
-
     return status;
   }
 

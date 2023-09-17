@@ -43,6 +43,7 @@ class LeatherbackSDK {
   List<Channel> channels;
   Channel? _selected;
   PaymentParam _param = PaymentParam();
+  PaymentResponse _paymentResponse = PaymentResponse();
   LeatherbackResponse _response = LeatherbackResponse();
   final int amount;
   final String currency;
@@ -71,9 +72,10 @@ class LeatherbackSDK {
     _param = PaymentParam();
     _response = LeatherbackResponse();
     _isLoading = false;
+    _paymentResponse = PaymentResponse();
   }
 
-  Future<LeatherbackResponse> makePayment() async {
+  Future<LeatherbackResponse> makePaymentTest() async {
     await _dialogService.showAppDialog(
       CardAuthScreen(
         amount: amount,
@@ -94,47 +96,37 @@ class LeatherbackSDK {
     return _response;
   }
 
-  // Future<LeatherbackResponse> makePayment() async {
-  //   try {
-  //     _reset();
-  //     await _validatePayment();
-  //     await _selectPaymentChannel();
-  //     _param = PaymentParam(
-  //       amount: amount,
-  //       channel: _selected?.slug,
-  //       narration: 'Payment from mobile',
-  //       userInformation: customer,
-  //       currency: currency,
-  //       reference: reference,
-  //     );
-  //     if (_selected == Channel.card) {
-  //       await _makePaymentWithCard();
-  //     } else if (_selected == Channel.transfer) {
-  //       await _makePaymentWithBankTransfer();
-  //     }
-  //     return _response;
-  //   } catch (e) {
-  //     _closeLoading();
-  //     _response = LeatherbackResponse(isSuccess: false, message: e.toString());
-  //     await _dialogService.showAppDialog(
-  //       TransactionStatusScreen.failed(message: e.toString()),
-  //     );
-  //     return _response;
-  //   }
-  // }
+  Future<LeatherbackResponse> makePayment() async {
+    try {
+      _reset();
+      await _validatePayment();
+      await _selectPaymentChannel();
+      _param = PaymentParam(
+        amount: amount,
+        channel: _selected?.slug,
+        narration: 'Payment from mobile',
+        userInformation: customer,
+        currency: currency,
+        reference: reference,
+      );
+      if (_selected == Channel.card) {
+        await _makePaymentWithCard();
+      } else if (_selected == Channel.transfer) {
+        await _makePaymentWithBankTransfer();
+      }
+      return _response;
+    } catch (e) {
+      await _showError(e.toString());
+      return _response;
+    }
+  }
 
   Future<void> _makePaymentWithCard() async {
     _closeLoading();
     final res = await _dialogService.showAppDialog(
       CardInputScreen(amount: amount, currency: currency),
     );
-    if (res == null) {
-      _response = LeatherbackResponse(
-        isSuccess: false,
-        message: 'Canceled!',
-      );
-      return;
-    }
+    if (res == null) return;
     _param.paymentRequestProps = PaymentRequestProps(
       card: res as PaymentCard,
       returnUrl: "https://pay.leatherback.co/redirect",
@@ -143,103 +135,97 @@ class LeatherbackSDK {
       _param.metaData = {"redirect-url": "https://pay.leatherback.co/finalize"};
     }
     _showLoading();
-    final paymentRes = await _paymentService.initiatePayment(_param);
-    if (paymentRes.paymentStatus == PaymentStatus.failed.title) {
-      _response = LeatherbackResponse(
-        isSuccess: false,
-        message: paymentRes.message,
-      );
-    } else if (paymentRes.paymentStatus == PaymentStatus.initiated.title) {
+    _paymentResponse = await _paymentService.initiatePayment(_param);
+    if (_paymentResponse.paymentStatus == PaymentStatus.failed.title) {
+      throw LeatherbackException('Transaction Failed!');
+    } else if (_paymentResponse.paymentStatus ==
+        PaymentStatus.initiated.title) {
       if (currency == 'GBP') {
-        await _checkTransactionStatus(paymentRes);
+        await _checkTransactionStatus();
       } else {
-        await _finalisePayment(paymentRes);
+        await _finalisePayment();
       }
-    } else if (paymentRes.paymentStatus ==
-        PaymentStatus.requireBankAuth.title) {}
+    } else if (_paymentResponse.paymentStatus ==
+        PaymentStatus.requireBankAuth.title) {
+      await _completeBankAuth();
+    }
   }
 
-  Future<void> _finalisePayment(PaymentResponse paymentResponse) async {
+  Future<void> _completeBankAuth() async {
+    final res = await _paymentService.getAuth3ds(
+      _paymentResponse.paymentItem?.reference ?? '',
+    );
+    _closeLoading();
+    final status = await _dialogService.showAppDialog(
+      CardAuthScreen(
+        amount: amount,
+        currency: currency,
+        html: res,
+      ),
+    );
+    if (status != null && status) {
+      await _finalisePayment();
+    } else {
+      throw LeatherbackException('Transaction failed!');
+    }
+  }
+
+  Future<void> _finalisePayment() async {
     _closeLoading();
     _isLoading = true;
     _dialogService.showAppDialog(
-      FinalisePaymentScreen(
-        amount: amount,
-        currency: currency,
-      ),
+      FinalisePaymentScreen(amount: amount, currency: currency),
     );
     final res = await _paymentService.finalisePayment(
-      paymentResponse.paymentItem?.reference ?? '',
+      _paymentResponse.paymentItem?.reference ?? '',
     );
-    _isLoading = true;
+    _isLoading = false;
     _dialogService.dismiss();
     if (res.success) {
-      _response = LeatherbackResponse(
-        isSuccess: true,
-        message: 'Payment Successful',
-        data: paymentResponse.paymentItem?.paymentReference,
-      );
-      await _dialogService.showAppDialog(
-        const TransactionStatusScreen.success(),
-      );
+      await _showSuccess();
     } else {
-      _response = LeatherbackResponse(
-        message: res.message,
-        isSuccess: false,
-      );
+      throw LeatherbackException(res.message ?? '');
     }
   }
 
   Future<void> _makePaymentWithBankTransfer() async {
-    final paymentRes = await _paymentService.initiatePayment(_param);
+    _paymentResponse = await _paymentService.initiatePayment(_param);
     _closeLoading();
-    if (paymentRes.paymentStatus == PaymentStatus.failed.title ||
-        paymentRes.paymentItem?.transferInfo == null) {
-      _response = LeatherbackResponse(
-        isSuccess: false,
-        message: paymentRes.message,
-      );
-    } else if (paymentRes.paymentStatus ==
+    if (_paymentResponse.paymentStatus == PaymentStatus.failed.title ||
+        _paymentResponse.paymentItem?.transferInfo == null) {
+      throw LeatherbackException(_paymentResponse.message ?? '');
+    } else if (_paymentResponse.paymentStatus ==
         PaymentStatus.requireOfflineAction.title) {
       final res = await _dialogService.showAppDialog(
         BankTransferDetailsScreen(
           amount: amount,
           currency: currency,
-          transferInfo: paymentRes.paymentItem!.transferInfo!,
+          transferInfo: _paymentResponse.paymentItem!.transferInfo!,
         ),
       );
       if (res == null) return;
       if (res as bool) {
         _showLoading();
-        await _checkTransactionStatus(paymentRes);
+        await _checkTransactionStatus();
       } else {
         throw LeatherbackException('Transaction Canceled!');
       }
     }
   }
 
-  Future<void> _checkTransactionStatus(PaymentResponse response) async {
+  Future<void> _checkTransactionStatus() async {
     final status = await _paymentService
-        .transactionStatus(response.paymentItem?.reference ?? '');
-    _closeLoading();
-    _response = LeatherbackResponse(
-      isSuccess: true,
-      message: 'Payment Successful',
-      data: status.paymentReference,
-    );
-    await _dialogService.showAppDialog(const TransactionStatusScreen.success());
+        .transactionStatus(_paymentResponse.paymentItem?.reference ?? '');
+    // if (status.paymentStatus != 0) {
+    //   throw LeatherbackException('Transaction Failed');
+    // }
+    await _showSuccess();
   }
 
   Future<void> _completeNGNCardPayment(PaymentResponse response) async {
     _dialogService.dismiss();
     final status = await _paymentService
         .transactionStatus(response.paymentItem?.reference ?? '');
-    await _dialogService.showAppDialog(const TransactionStatusScreen.success());
-    _response = LeatherbackResponse(
-      isSuccess: true,
-      message: 'Payment Successful',
-      data: status.paymentReference,
-    );
   }
 
   Future<void> _validatePayment() async {
@@ -275,6 +261,24 @@ class LeatherbackSDK {
   Future<void> _showLoading() async {
     _isLoading = true;
     await _dialogService.showLoading();
+  }
+
+  Future<void> _showSuccess() async {
+    _closeLoading();
+    await _dialogService.showAppDialog(const TransactionStatusScreen.success());
+    _response = LeatherbackResponse(
+      isSuccess: true,
+      message: 'Payment Successful',
+      data: _paymentResponse.paymentItem?.reference,
+    );
+  }
+
+  Future<void> _showError(String error) async {
+    _closeLoading();
+    _response = LeatherbackResponse(isSuccess: false, message: error);
+    await _dialogService.showAppDialog(
+      TransactionStatusScreen.failed(message: error),
+    );
   }
 
   void _closeLoading() {

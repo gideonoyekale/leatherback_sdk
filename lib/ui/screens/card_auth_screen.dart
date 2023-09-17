@@ -1,5 +1,7 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
-import 'package:flutter_widget_from_html/flutter_widget_from_html.dart';
+import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:leatherback_sdk/core/cores.dart';
 import 'package:leatherback_sdk/ui/widgets/app_rectangle.dart';
 import 'package:leatherback_sdk/ui/widgets/base_dialog_screen.dart';
@@ -27,6 +29,13 @@ class _CardAuthScreenState extends State<CardAuthScreen> {
 
   late WebViewController _controller;
 
+  final viewPortHtml =
+      '<head> <meta name="viewport" content="width=device-width, initial-scale=0.75, user-scalable=1.0, minimum-scale=0.25, maximum-scale=1.0"></head> ';
+
+  ///[INFO:CONSOLE(0)] "[Report Only] Refused to frame 'https://mtf.gateway.mastercard.com/' because an ancestor violates the following Content Security Policy directive: "frame-ancestors 'self'".
+  ///[INFO:CONSOLE(1)] "Uncaught Error: Method not found", source: https://mtf.gateway.mastercard.com/callbackInterface/gateway/83334e24d6e90db856a67c874f7fc64b7bc63aeb90e1911f4cd2a82f90212a37 (1)
+  ///window.opener.postMessage({\"auth\":true}, \"*\");
+
   @override
   void initState() {
     // TODO: implement initState
@@ -34,48 +43,46 @@ class _CardAuthScreenState extends State<CardAuthScreen> {
     _initPage();
   }
 
-  void _initPage() {
-    _controller = WebViewController()
-      ..setJavaScriptMode(JavaScriptMode.unrestricted)
-      ..setBackgroundColor(Colors.white)
-      // ..setUserAgent(
-      //     'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/104.0.5112.79 Safari/537.36')
-      ..setNavigationDelegate(
-        NavigationDelegate(
-          onProgress: (int i) {
-            debugPrint("Progress: $i");
-            progress = i;
-            setState(() {});
-          },
-          onPageStarted: (String url) {
-            debugPrint("Started: $url");
-          },
-          onPageFinished: (String url) {
-            debugPrint("Finished: $url");
-            progress = 0;
-            setState(() {});
-          },
-          onUrlChange: (url) {
-            debugPrint('UrlChange: ${url.url}');
-          },
-          onWebResourceError: (WebResourceError error) {
-            debugPrint('WebResourceError: ${error.url}');
-            debugPrint('WebResourceError: ${error.description}');
-          },
-          onNavigationRequest: (NavigationRequest request) {
-            debugPrint('Navigation: ${request.url}');
-            if (request.url.contains('sandbox.dwayremit.com')) {
-              return NavigationDecision.prevent;
-            }
-            return NavigationDecision.navigate;
-          },
-        ),
-      )
-      // ..enableZoom(true)
-      ..loadHtmlString(
-          '<head> <meta name="viewport" content="width=device-width, initial-scale=0.75, user-scalable=1.0, minimum-scale=0.25, maximum-scale=1.0"></head> <div id="threedsChallengeRedirect" xmlns="http://www.w3.org/1999/html" style="height: 100vh"> <form id ="threedsChallengeRedirectForm" method="POST" action="https://mtf.gateway.mastercard.com/acs/mastercard/v2/prompt" target="challengeFrame"> <input type="hidden" name="creq" value="eyJ0aHJlZURTU2VydmVyVHJhbnNJRCI6ImU4ODdjOWJiLTY3ZWUtNDEzYS1hYTcxLTAxODc0Yjg0ODZlMSJ9" /> </form> <iframe id="challengeFrame" name="challengeFrame" width="100%" height="100%" ></iframe> <script id="authenticate-payer-script"> var e=document.getElementById("threedsChallengeRedirectForm"); if (e) { e.submit(); if (e.parentNode !== null) { e.parentNode.removeChild(e); } } </script> </div>');
-    // ..loadRequest(Uri.parse(
-    //     'https://webhook.site/5d1c8c84-7e31-4a2c-b852-06f72703fdf7'));
+  final GlobalKey webViewKey = GlobalKey();
+
+  InAppWebViewController? webViewController;
+  InAppWebViewGroupOptions options = InAppWebViewGroupOptions(
+      crossPlatform: InAppWebViewOptions(
+        useShouldOverrideUrlLoading: true,
+        mediaPlaybackRequiresUserGesture: false,
+      ),
+      android: AndroidInAppWebViewOptions(
+        useHybridComposition: true,
+      ),
+      ios: IOSInAppWebViewOptions(
+        allowsInlineMediaPlayback: true,
+      ));
+
+  String url = "";
+
+  _initInAppWebView() async {
+    // if (Platform.isAndroid) {
+    //   await AndroidInAppWebViewController.setWebContentsDebuggingEnabled(true);
+    // }
+    webViewController?.loadData(data: '''
+    '$viewPortHtml ${widget.html}'
+''');
+    // webViewController?.loadData(data: '''      <html>
+    //
+    // <head>
+    // <script type="text/javascript">
+    //     function invokeNative() {
+    //     window.flutter_inappwebview.callHandler("myHandlerName", "You are good");
+    //   window.parent.postMessage(JSON.stringify({ "result":"SUCCESS" }));
+    // }
+    // </script> </head>
+    //
+    // <body>
+    // <form>
+    // <input type="button" value="Click me!" onclick="invokeNative()" />
+    // </form> </body>
+    //
+    // </html>''');
   }
 
   @override
@@ -93,68 +100,90 @@ class _CardAuthScreenState extends State<CardAuthScreen> {
             color: Palette.white,
 
             ///
-            //       child: SingleChildScrollView(
-            //         child: HtmlWidget(
-            //           // the first parameter (`html`) is required
-            //           '''
-            //               <form id ="threedsChallengeRedirectForm" method="POST" action="https://mtf.gateway.mastercard.com/acs/mastercard/v2/prompt" target="challengeFrame">
-            //     <input type="hidden" name="creq" value="eyJ0aHJlZURTU2VydmVyVHJhbnNJRCI6ImU4ODdjOWJiLTY3ZWUtNDEzYS1hYTcxLTAxODc0Yjg0ODZlMSJ9" />
-            // </form>
-            // <iframe id="challengeFrame" name="challengeFrame" width="100%" height="100%" ></iframe>
-            // <script id="authenticate-payer-script"> var e=document.getElementById("threedsChallengeRedirectForm"); if (e) { e.submit(); if (e.parentNode !== null) { e.parentNode.removeChild(e); } } </script>
-            //           ''',
+            // child: InAppWebView(
+            //   key: webViewKey,
+            //   initialUrlRequest:
+            //       URLRequest(url: Uri.parse("https://inappwebview.dev/")),
+            //   initialOptions: options,
+            //   onWebViewCreated: (controller) {
+            //     webViewController = controller;
+            //     _initInAppWebView();
+            //     controller.addJavaScriptHandler(
+            //         handlerName: 'myHandlerName',
+            //         callback: (args) {
+            //           Console.log('myHandlerName', url.toString());
+            //           return {'bar': 'bar_value', 'baz': 'baz_value'};
+            //         });
+            //   },
+            //   onLoadStart: (controller, url) {
+            //     Console.log('onLoadStart', url.toString());
+            //   },
+            //   androidOnPermissionRequest:
+            //       (controller, origin, resources) async {
+            //     Console.log('androidOnPermissionRequest', origin);
+            //     return PermissionRequestResponse(
+            //       resources: resources,
+            //       action: PermissionRequestResponseAction.GRANT,
+            //     );
+            //   },
+            //   shouldOverrideUrlLoading: (controller, navigationAction) async {
+            //     var uri = navigationAction.request.url!;
+            //     Console.log('shouldOverrideUrlLoading', url.toString());
             //
-            //           // all other parameters are optional, a few notable params:
+            //     // if (![ "http", "https", "file", "chrome",
+            //     //   "data", "javascript", "about"].contains(uri.scheme)) {
+            //     //   if (await canLaunch(url)) {
+            //     //     // Launch the App
+            //     //     await launch(
+            //     //       url,
+            //     //     );
+            //     //     // and cancel the request
+            //     //     return NavigationActionPolicy.CANCEL;
+            //     //   }
+            //     // }
             //
-            //           // specify custom styling for an element
-            //           // see supported inline styling below
-            //           baseUrl: Uri.parse(
-            //               'https://mtf.gateway.mastercard.com/acs/mastercard/v2/prompt'),
-            //           customStylesBuilder: (element) {
-            //             Console.log('CSSS_BUILDER', element.text);
-            //             if (element.classes.contains('foo')) {
-            //               return {'color': 'red'};
-            //             }
-            //
-            //             return null;
-            //           },
-            //           factoryBuilder: () => _WidgetFactory(),
-            //
-            //           // render a custom widget
-            //           customWidgetBuilder: (element) {
-            //             Console.log('CUSTOM_BUILDER', element.text);
-            //             // if (element.attributes['foo'] == 'bar') {
-            //             //   return FooBarWidget();
-            //             // }
-            //
-            //             return null;
-            //           },
-            //
-            //           // these callbacks are called when a complicated element is loading
-            //           // or failed to render allowing the app to render progress indicator
-            //           // and fallback widget
-            //           onErrorBuilder: (context, element, error) {
-            //             Console.log('ERROR_BUILDER', error.toString());
-            //             return Text('$element error: $error');
-            //           },
-            //           onLoadingBuilder: (context, element, loadingProgress) {
-            //             Console.log('LOADING_BUILDER', loadingProgress);
-            //             return CircularProgressIndicator();
-            //           },
-            //           // this callback will be triggered when user taps a link
-            //           // onTapUrl: (url) => print('tapped $url'),
-            //
-            //           // select the render mode for HTML body
-            //           // by default, a simple `Column` is rendered
-            //           // consider using `ListView` or `SliverList` for better performance
-            //           renderMode: RenderMode.column,
-            //
-            //           // set the default styling for text
-            //           textStyle: TextStyle(fontSize: 14),
-            //
-            //           // turn on `webView` if you need IFRAME support (it's disabled by default)
-            //         ),
-            //       ),
+            //     return NavigationActionPolicy.ALLOW;
+            //   },
+            //   onLoadStop: (controller, url) async {
+            //     Console.log('onLoadStop', url.toString());
+            //     progress = 0;
+            //     setState(() {});
+            //   },
+            //   onLoadError: (controller, url, code, message) {
+            //     Console.log('onProgressChanged', url.toString());
+            //   },
+            //   onProgressChanged: (controller, p) {
+            //     Console.log('onProgressChanged', url.toString());
+            //     if (progress == 100) {
+            //       progress = 0;
+            //     }
+            //     progress = p;
+            //     setState(() {});
+            //   },
+            //   onUpdateVisitedHistory: (controller, url, androidIsReload) {
+            //     Console.log('onUpdateVisitedHistory', url.toString());
+            //     // this.url = url.toString();
+            //   },
+            //   onConsoleMessage: (controller, consoleMessage) {
+            //     Console.log('onConsoleMessage', consoleMessage.message);
+            //   },
+            //   onLoadHttpError: (controller, uri, i, str) {
+            //     Console.log('onLoadHttpError', str);
+            //   },
+            //   onJsAlert: (controller, alert) {
+            //     Console.log('onJsAlert', alert.message);
+            //     return Future.value(null);
+            //   },
+            //   onJsPrompt: (controller, alert) {
+            //     Console.log('onJsPrompt', alert.message);
+            //     return Future.value(null);
+            //   },
+            //   onLoadResource: (controller, res) {
+            //     Console.log('onLoadResource', res.url);
+            //   },
+            // ),
+
+            ///
             child: Center(
               child: progress > 0
                   ? Lottie.asset(
@@ -163,7 +192,21 @@ class _CardAuthScreenState extends State<CardAuthScreen> {
                     )
                   : WebViewWidget(
                       controller: _controller,
-                      layoutDirection: TextDirection.ltr,
+                      // gestureRecognizers: <Factory<
+                      //     OneSequenceGestureRecognizer>>{
+                      //   Factory<OneSequenceGestureRecognizer>(
+                      //     () => TapGestureRecognizer()
+                      //       ..onTap = () {
+                      //         debugPrint('Tapppppppeddddd1111!!!!');
+                      //       }
+                      //       ..onSecondaryTap = () {
+                      //         debugPrint('Tapppppppeddddd2222!!!!');
+                      //       }
+                      //       ..onTertiaryTapDown = (details) {
+                      //         debugPrint('Tapppppppeddddd3333!!!!');
+                      //       },
+                      //   ),
+                      // },
                     ),
             ),
           ),
@@ -172,17 +215,100 @@ class _CardAuthScreenState extends State<CardAuthScreen> {
     );
   }
 
-  final hh =
-      '<div id="threedsChallengeRedirect" xmlns="http://www.w3.org/1999/html" style="height: 100vh"> <form id ="threedsChallengeRedirectForm" method="POST" action="https://mtf.gateway.mastercard.com/acs/mastercard/v2/prompt" target="challengeFrame"> <input type="hidden" name="creq" value="eyJ0aHJlZURTU2VydmVyVHJhbnNJRCI6ImU4ODdjOWJiLTY3ZWUtNDEzYS1hYTcxLTAxODc0Yjg0ODZlMSJ9" /> </form> <iframe id="challengeFrame" name="challengeFrame" width="100%" height="100%" ></iframe> <script id="authenticate-payer-script"> var e=document.getElementById("threedsChallengeRedirectForm"); if (e) { e.submit(); if (e.parentNode !== null) { e.parentNode.removeChild(e); } } </script> </div>';
-}
-
-class _WidgetFactory extends WidgetFactory {
   @override
-  final bool webView = true;
+  void dispose() {
+    super.dispose();
+  }
 
-  @override
-  final bool webViewJs = true;
+  void _initPage() {
+    try {
+      _controller = WebViewController(onPermissionRequest: (req) async {
+        await req.grant();
+      })
+        ..setJavaScriptMode(JavaScriptMode.unrestricted)
+        ..setBackgroundColor(Colors.white)
+        // ..addJavaScriptChannel('document', onMessageReceived: (message) {
+        //   debugPrint("DOCUMENT: ${message.message}");
+        // })
+        ..addJavaScriptChannel('parent', onMessageReceived: (message) {
+          debugPrint("MessageFromParent: ${message.message}");
+          final res = jsonDecode(message.message);
+          if (res['result'] == 'SUCCESS') {
+            Navigator.pop(context, true);
+          } else {
+            Navigator.pop(context, false);
+          }
+        })
+        // ..addJavaScriptChannel('authenticationChallengeCompleteRedirectForm',
+        //     onMessageReceived: (message) {
+        //   debugPrint(
+        //       "authenticationChallengeCompleteRedirectForm: ${message.message}");
+        // })
 
-  @override
-  bool get webViewMediaPlaybackAlwaysAllow => true;
+        // ..setUserAgent(
+        //     'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/104.0.5112.79 Safari/537.36')
+        ..setNavigationDelegate(
+          NavigationDelegate(
+            onProgress: (int i) {
+              debugPrint("Progress: $i");
+              progress = i;
+              setState(() {});
+            },
+            onPageStarted: (String url) {
+              debugPrint("Started: $url");
+            },
+            onPageFinished: (String url) {
+              debugPrint("Finished: $url");
+              progress = 0;
+              setState(() {});
+            },
+            onUrlChange: (url) {
+              debugPrint('UrlChange: ${url.url}');
+            },
+            onWebResourceError: (WebResourceError error) {
+              debugPrint('WebResourceError: ${error.url}');
+              debugPrint('WebResourceError: ${error.description}');
+            },
+            onNavigationRequest: (NavigationRequest request) {
+              debugPrint('Navigation: ${request.url}');
+              if (request.url.contains('sandbox.dwayremit.com')) {
+                return NavigationDecision.prevent;
+              }
+              return NavigationDecision.navigate;
+            },
+          ),
+        )
+        ..enableZoom(true)
+        ..loadHtmlString('$viewPortHtml ${widget.html}');
+//         ..loadHtmlString(
+//           '''
+//           <html>
+//
+// <head>
+//     <script type="text/javascript">
+//       function onLoadSubmit() {
+//       if (window.parent) {
+//           window.parent.postMessage(JSON.stringify({
+//               "result": 'Na me guy'
+//           }), '*');
+//       };
+//       if (document.getElementById('delegate') && document.getElementById('result').value == 'PENDING' && document.getElementById('delegate').value == 'NPCI') {
+//           return;
+//       }
+//       document.authenticationChallengeCompleteRedirectForm.submit();
+//     }
+//     </script> </head>
+//
+// <body>
+//     <form>
+//         <input type="button" value="Click me!" onclick="onLoadSubmit()" />
+//     </form> </body>
+//
+// </html>
+//           ''',
+//         );
+    } catch (e) {
+      debugPrint('ERRRROOOORR: $e');
+    }
+  }
 }
