@@ -239,12 +239,6 @@ class _CardAuthScreenState extends State<CardAuthScreen> {
             Navigator.pop(context, false);
           }
         })
-        // ..addJavaScriptChannel('authenticationChallengeCompleteRedirectForm',
-        //     onMessageReceived: (message) {
-        //   debugPrint(
-        //       "authenticationChallengeCompleteRedirectForm: ${message.message}");
-        // })
-
         // ..setUserAgent(
         //     'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/104.0.5112.79 Safari/537.36')
         ..setNavigationDelegate(
@@ -279,34 +273,26 @@ class _CardAuthScreenState extends State<CardAuthScreen> {
           ),
         )
         ..enableZoom(true)
-        ..loadHtmlString('$viewPortHtml ${widget.html}');
+        ..loadHtmlString('$viewPortHtml ${widget.html}'
 //         ..loadHtmlString(
-//           '''
-//           <html>
-//
+//           '''$viewPortHtml
+// <html>
 // <head>
-//     <script type="text/javascript">
-//       function onLoadSubmit() {
-//       if (window.parent) {
-//           window.parent.postMessage(JSON.stringify({
-//               "result": 'Na me guy'
-//           }), '*');
-//       };
-//       if (document.getElementById('delegate') && document.getElementById('result').value == 'PENDING' && document.getElementById('delegate').value == 'NPCI') {
-//           return;
-//       }
-//       document.authenticationChallengeCompleteRedirectForm.submit();
-//     }
-//     </script> </head>
-//
+//   <title>Child Window</title>
+// </head>
 // <body>
-//     <form>
-//         <input type="button" value="Click me!" onclick="onLoadSubmit()" />
-//     </form> </body>
+//   <button onclick="sendMessage()">Send Message to Parent</button>
 //
+//   <script>
+//     function sendMessage() {
+//       const message = {'result':'Hello from Child Window!'};
+//       window.parent.postMessage(JSON.stringify(message));
+//     }
+//   </script>
+// </body>
 // </html>
 //           ''',
-//         );
+        );
     } catch (e) {
       debugPrint('ERRRROOOORR: $e');
     }
